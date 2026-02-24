@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B0861 Branch Performance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 1rem; border: 1px solid #e2e8f0; background: white; }
+        table { min-width: 850px; width: 100%; border-collapse: collapse; }
+        .nav-active { background-color: #2563eb !important; color: white !important; }
+        .chart-container { position: relative; height: 350px; width: 100%; }
+        .badge-success { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; border: 1px solid #bbf7d0; }
+        .badge-pending { background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; border: 1px solid #fecaca; }
+        #logo-preview { max-width: 100%; height: auto; display: block; }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row min-h-screen">
+
+    <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col border-r border-slate-800">
+        <div class="p-6 flex-1">
+            <div class="mb-10 flex flex-col items-center">
+                <div id="sidebar-logo-container" class="w-full flex justify-center">
+                    <p id="no-logo-text" class="text-[10px] text-slate-500 italic">No Logo Uploaded</p>
+                    <img id="sidebar-logo" src="" alt="ASA Philippines" class="hidden w-full h-auto object-contain px-2">
+                </div>
+                <div class="h-px w-full bg-slate-800 mt-6"></div>
+            </div>
+            
+            <nav class="space-y-2" id="mainNav">
+                <button onclick="showPage('dashboard')" id="btn-dashboard" class="nav-active w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-left transition-all">Dashboard</button>
+                <button onclick="showPage('monthly')" id="btn-monthly" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-semibold text-left transition-all">Monthly Trends</button>
+                <button onclick="showPage('target-trend')" id="btn-target-trend" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-semibold text-left transition-all">Target Trend</button>
+                <button onclick="showPage('data-entry')" id="btn-data-entry" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-semibold text-left transition-all">Data Entry</button>
+                <button onclick="showPage('manage-mfo')" id="btn-manage-mfo" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400 font-semibold text-left transition-all">Settings</button>
+            </nav>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+        <div id="page-dashboard" class="page-content space-y-8">
+            <header>
+                <h1 class="text-4xl font-extrabold tracking-tight uppercase">B0861 STO. TOMAS</h1>
+                <div class="mt-2 flex items-center gap-2 bg-white px-3 py-1 rounded-lg border shadow-sm w-fit">
+                    <input type="date" id="dashDate" onchange="renderDashboard()" class="font-bold text-blue-600 outline-none">
+                </div>
+            </header>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6" id="statsRibbon"></div>
+            <div class="table-wrapper shadow-sm">
+                <table class="text-sm text-left">
+                    <thead class="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] border-b">
+                        <tr>
+                            <th class="px-6 py-4">MFO Name</th>
+                            <th class="px-6 py-4 text-center">Clients</th>
+                            <th class="px-6 py-4 text-right">Portfolio</th>
+                            <th class="px-6 py-4 text-right">Disbursement</th>
+                            <th class="px-6 py-4 text-right">Collection</th>
+                            <th class="px-6 py-4 text-right">Revenue</th>
+                            <th class="px-6 py-4 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-3xl border shadow-sm"><div class="chart-container"><canvas id="barChart"></canvas></div></div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm"><div class="chart-container"><canvas id="pieChart"></canvas></div></div>
+            </div>
+        </div>
+
+        <div id="page-monthly" class="page-content hidden space-y-8">
+            <h1 class="text-4xl font-extrabold">Monthly Trends</h1>
+            <div class="bg-white p-6 rounded-3xl border shadow-sm"><div class="chart-container"><canvas id="trendChart"></canvas></div></div>
+        </div>
+
+        <div id="page-target-trend" class="page-content hidden space-y-8">
+            <h1 class="text-4xl font-extrabold">Target Trend</h1>
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                <div class="xl:col-span-1 bg-white p-6 rounded-3xl border shadow-sm h-fit">
+                    <h3 class="text-lg font-bold mb-4">Assign Targets</h3>
+                    <form id="targetForm" class="space-y-4">
+                        <input type="month" id="tMonth" required class="w-full p-2 bg-slate-50 border rounded-lg">
+                        <select id="tMFO" required class="w-full p-2 bg-slate-50 border rounded-lg"></select>
+                        <input type="number" id="tClients" placeholder="Clients Target" required class="w-full p-2 border rounded-lg">
+                        <input type="number" id="tPort" placeholder="Portfolio Target" required class="w-full p-2 border rounded-lg">
+                        <input type="number" id="tColl" placeholder="Collection Target" required class="w-full p-2 border rounded-lg">
+                        <input type="number" id="tDisb" placeholder="Disbursement Target" required class="w-full p-2 border rounded-lg">
+                        <button type="submit" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl shadow-md">Save Target</button>
+                    </form>
+                </div>
+                <div class="xl:col-span-3 space-y-6">
+                    <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xs font-black uppercase text-slate-400">Target vs. Latest Performance</h3>
+                            <select id="targetMetric" onchange="refreshTargetTrend()" class="text-xs font-bold border rounded px-3 py-1 bg-blue-50 border-blue-200 text-blue-700 outline-none">
+                                <option value="port">Portfolio (₱)</option>
+                                <option value="clients">Active Clients</option>
+                                <option value="coll">Collection (₱)</option>
+                                <option value="disb">Disbursement (₱)</option>
+                            </select>
+                        </div>
+                        <div class="chart-container"><canvas id="targetVsActualChart"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-3xl border shadow-sm overflow-hidden">
+                        <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
+                            <h3 class="text-xs font-black uppercase text-slate-400">Monthly Target Log</h3>
+                            <div id="statusIndicator" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 uppercase"></div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="text-sm text-left">
+                                <thead class="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                                    <tr>
+                                        <th class="px-6 py-3">Month</th>
+                                        <th class="px-6 py-3">MFO</th>
+                                        <th class="px-6 py-3 text-right">Target Value</th>
+                                        <th class="px-6 py-3 text-right">Actual Value</th>
+                                        <th class="px-6 py-3 text-center">Status</th>
+                                        <th class="px-6 py-3 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="targetTableBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-manage-mfo" class="page-content hidden space-y-10 max-w-4xl mx-auto pt-10">
+            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border">
+                <h2 class="text-3xl font-black mb-4">Branch Branding</h2>
+                <p class="text-slate-500 mb-6 text-sm">Upload your branch logo (ASA Philippines). This will be saved in your browser.</p>
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="w-48 h-48 bg-slate-50 border-2 border-dashed rounded-2xl flex items-center justify-center overflow-hidden">
+                        <img id="settings-logo-preview" src="" class="hidden w-full h-full object-contain">
+                        <span id="preview-placeholder" class="text-slate-300 text-xs font-bold">No Image</span>
+                    </div>
+                    <div class="flex-1 space-y-4">
+                        <input type="file" id="logo-upload" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                        <div class="flex gap-2">
+                            <button onclick="saveLogo()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm">Save Logo</button>
+                            <button onclick="clearLogo()" class="px-6 py-2 bg-slate-200 text-slate-600 font-bold rounded-lg text-sm">Remove</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border">
+                <h2 class="text-3xl font-black mb-8">MFO Directory</h2>
+                <div class="flex gap-2 mb-8">
+                    <input type="text" id="newMfoInput" class="flex-1 p-4 bg-slate-50 border rounded-2xl" placeholder="Full Name">
+                    <button onclick="addMfo()" class="px-6 py-4 bg-slate-900 text-white font-bold rounded-2xl">Add MFO</button>
+                </div>
+                <div id="mfoList" class="space-y-3"></div>
+            </div>
+
+            <div class="bg-red-50 p-10 rounded-[2.5rem] shadow-xl border border-red-100">
+                <h2 class="text-3xl font-black text-red-700 mb-4">Reset System</h2>
+                <p class="text-red-600 mb-6 text-sm">Deleting all data will clear all logs, targets, MFO names, and your uploaded logo. This action is permanent.</p>
+                <button onclick="resetAllData()" class="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl transition-colors shadow-lg shadow-red-100">
+                    Delete All Saved Data
+                </button>
+            </div>
+        </div>
+
+        <div id="page-data-entry" class="page-content hidden max-w-2xl mx-auto pt-10">
+            <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border">
+                <h2 class="text-3xl font-black mb-6">Daily Reporting</h2>
+                <form id="entryForm" class="grid grid-cols-2 gap-6">
+                    <input type="date" id="fDate" required class="p-4 bg-slate-50 border rounded-2xl">
+                    <select id="fMFO" required class="p-4 bg-slate-50 border rounded-2xl"></select>
+                    <input type="number" id="fClients" placeholder="Clients" required class="p-4 border rounded-2xl">
+                    <input type="number" id="fPort" placeholder="Portfolio" required class="p-4 border rounded-2xl">
+                    <input type="number" id="fDisb" placeholder="Disbursement" required class="p-4 border rounded-2xl">
+                    <input type="number" id="fColl" placeholder="Collection" required class="p-4 border rounded-2xl">
+                    <input type="number" id="fRev" placeholder="Revenue" required class="col-span-2 p-4 border rounded-2xl">
+                    <button type="submit" class="col-span-2 py-5 bg-blue-600 text-white font-black rounded-2xl">Submit Entry</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let mfos = JSON.parse(localStorage.getItem('b0861_mfos')) || ["Danice Sheena Mae Celis", "Richard Rosimo", "Mikka Jeil Soriano", "Prince Luciñada"];
+        let logs = JSON.parse(localStorage.getItem('b0861_logs')) || [];
+        let targets = JSON.parse(localStorage.getItem('b0861_targets')) || [];
+        let branchLogo = localStorage.getItem('b0861_logo') || "";
+        let chartBar, chartPie, chartTrend, chartTarget;
+
+        function initLogo() {
+            const sidebarLogo = document.getElementById('sidebar-logo');
+            const noLogoText = document.getElementById('no-logo-text');
+            const settingsPreview = document.getElementById('settings-logo-preview');
+            const previewPlaceholder = document.getElementById('preview-placeholder');
+
+            if (branchLogo) {
+                sidebarLogo.src = branchLogo;
+                sidebarLogo.classList.remove('hidden');
+                noLogoText.classList.add('hidden');
+                if (settingsPreview) {
+                    settingsPreview.src = branchLogo;
+                    settingsPreview.classList.remove('hidden');
+                    previewPlaceholder.classList.add('hidden');
+                }
+            } else {
+                sidebarLogo.classList.add('hidden');
+                noLogoText.classList.remove('hidden');
+            }
+        }
+
+        function saveLogo() {
+            const file = document.getElementById('logo-upload').files[0];
+            if (!file) return alert("Please select an image first.");
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                branchLogo = e.target.result;
+                localStorage.setItem('b0861_logo', branchLogo);
+                initLogo();
+                alert("Logo updated successfully!");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearLogo() {
+            localStorage.removeItem('b0861_logo');
+            branchLogo = "";
+            initLogo();
+            document.getElementById('settings-logo-preview').classList.add('hidden');
+            document.getElementById('preview-placeholder').classList.remove('hidden');
+        }
+
+        function showPage(id) {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + id).classList.remove('hidden');
+            document.querySelectorAll('#mainNav button').forEach(btn => {
+                btn.classList.remove('nav-active', 'bg-blue-600', 'text-white');
+                btn.classList.add('text-slate-400');
+                if(btn.id === 'btn-' + id) btn.classList.add('nav-active');
+            });
+            if(id === 'dashboard') renderDashboard();
+            if(id === 'monthly') renderMonthly();
+            if(id === 'target-trend') refreshTargetTrend();
+            if(id === 'data-entry') populateMfoSelect();
+            if(id === 'manage-mfo') { renderMfoList(); initLogo(); }
+        }
+
+        function renderDashboard() {
+            const date = document.getElementById('dashDate').value;
+            const data = logs.filter(l => l.date === date);
+            const tbody = document.getElementById('dashTableBody');
+            const totals = data.reduce((acc, curr) => {
+                acc.c += Number(curr.clients); acc.p += Number(curr.port);
+                acc.d += Number(curr.disb); acc.cl += Number(curr.coll);
+                return acc;
+            }, {c:0, p:0, d:0, cl:0});
+
+            document.getElementById('statsRibbon').innerHTML = `
+                <div class="bg-white p-5 rounded-2xl border"><p class="text-[10px] font-black uppercase text-slate-400">Clients</p><p class="text-2xl font-black">${totals.c}</p></div>
+                <div class="bg-white p-5 rounded-2xl border-l-4 border-blue-500"><p class="text-[10px] font-black uppercase text-slate-400">Portfolio</p><p class="text-2xl font-black">₱${totals.p.toLocaleString()}</p></div>
+                <div class="bg-white p-5 rounded-2xl border-l-4 border-orange-500"><p class="text-[10px] font-black uppercase text-slate-400">Disb.</p><p class="text-2xl font-black">₱${totals.d.toLocaleString()}</p></div>
+                <div class="bg-white p-5 rounded-2xl border-l-4 border-emerald-500"><p class="text-[10px] font-black uppercase text-slate-400">Coll.</p><p class="text-2xl font-black">₱${totals.cl.toLocaleString()}</p></div>`;
+
+            tbody.innerHTML = data.map(l => `
+                <tr class="hover:bg-slate-50 border-b">
+                    <td class="px-6 py-4 font-bold">${l.name}</td>
+                    <td class="px-6 py-4 text-center font-bold">${l.clients}</td>
+                    <td class="px-6 py-4 text-right">₱${Number(l.port).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right">₱${Number(l.disb).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right">₱${Number(l.coll).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-black text-blue-600">₱${Number(l.rev).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-center"><button onclick="deleteEntry(${logs.indexOf(l)})" class="text-red-400 font-bold">Delete</button></td>
+                </tr>`).join('');
+            updateDashCharts(data);
+        }
+
+        function updateDashCharts(data) {
+            if (chartBar) chartBar.destroy();
+            if (chartPie) chartPie.destroy();
+            if (!data.length) return;
+            chartBar = new Chart(document.getElementById('barChart'), {
+                type: 'bar', data: { labels: data.map(d => d.name), datasets: [{ label: 'Portfolio', data: data.map(d => d.port), backgroundColor: '#3b82f6', yAxisID: 'y' }, { label: 'Clients', data: data.map(d => d.clients), backgroundColor: '#cbd5e1', yAxisID: 'y1' }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y1: { position: 'right', grid: { display: false } } } }
+            });
+            chartPie = new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut', data: { labels: data.map(d => d.name), datasets: [{ data: data.map(d => d.clients), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderMonthly() {
+            const months = {};
+            logs.forEach(l => {
+                const mKey = l.date.substring(0, 7);
+                if (!months[mKey]) months[mKey] = { p: 0, cl: 0 };
+                months[mKey].p += Number(l.port); months[mKey].cl += Number(l.clients);
+            });
+            const sorted = Object.keys(months).sort();
+            if (chartTrend) chartTrend.destroy();
+            chartTrend = new Chart(document.getElementById('trendChart'), {
+                type: 'bar', data: { labels: sorted, datasets: [{ label: 'Portfolio', data: sorted.map(m => months[m].p), backgroundColor: 'rgba(59, 130, 246, 0.4)', yAxisID: 'y' }, { label: 'Clients', data: sorted.map(m => months[m].cl), borderColor: '#ef4444', type: 'line', yAxisID: 'y1' }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y1: { position: 'right' } } }
+            });
+        }
+
+        function refreshTargetTrend() { populateTargetMfoSelect(); renderTargetChart(); renderTargetTable(); }
+
+        function renderTargetChart() {
+            if (chartTarget) chartTarget.destroy();
+            const metric = document.getElementById('targetMetric').value;
+            const mfoLabels = mfos;
+            const targetValues = mfoLabels.map(mfo => {
+                const t = targets.filter(x => x.name === mfo).sort((a,b) => b.month.localeCompare(a.month))[0];
+                return t ? Number(t[metric]) : 0;
+            });
+            const actualValues = mfoLabels.map(mfo => {
+                const a = logs.filter(x => x.name === mfo).sort((a,b) => b.date.localeCompare(a.date))[0];
+                return a ? Number(a[metric]) : 0;
+            });
+            chartTarget = new Chart(document.getElementById('targetVsActualChart'), {
+                type: 'bar', data: { labels: mfoLabels, datasets: [{ label: 'Goal Target', data: targetValues, backgroundColor: '#e2e8f0' }, { label: 'Current Performance', data: actualValues, backgroundColor: '#2563eb' }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderTargetTable() {
+            const tbody = document.getElementById('targetTableBody');
+            const metric = document.getElementById('targetMetric').value;
+            document.getElementById('statusIndicator').innerText = `Evaluating: ${metric}`;
+            tbody.innerHTML = targets.map((t, idx) => {
+                const latestActual = logs.filter(l => l.name === t.name).sort((a,b) => b.date.localeCompare(a.date))[0];
+                const actualVal = latestActual ? Number(latestActual[metric]) : 0;
+                const targetVal = Number(t[metric]);
+                const isAchieved = actualVal >= targetVal && targetVal > 0;
+                return `<tr class="hover:bg-slate-50">
+                    <td class="px-6 py-4 font-black text-blue-600">${t.month}</td>
+                    <td class="px-6 py-4 font-bold">${t.name}</td>
+                    <td class="px-6 py-4 text-right font-semibold">${targetVal.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-bold text-blue-700">${actualVal.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-center">${isAchieved ? '<span class="badge-success">Achieved</span>' : '<span class="badge-pending">Pending</span>'}</td>
+                    <td class="px-6 py-4 text-center"><button onclick="deleteTarget(${idx})" class="text-red-400 font-bold hover:text-red-600">Remove</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function resetAllData() {
+            const check = confirm("⚠️ PERMANENT ACTION ⚠️\n\nThis will delete all logs, targets, and customization. Do you want to proceed?");
+            if(check) {
+                localStorage.removeItem('b0861_mfos');
+                localStorage.removeItem('b0861_logs');
+                localStorage.removeItem('b0861_targets');
+                localStorage.removeItem('b0861_logo');
+                alert("All data cleared. System will restart.");
+                location.reload();
+            }
+        }
+
+        function deleteTarget(i) { targets.splice(i, 1); localStorage.setItem('b0861_targets', JSON.stringify(targets)); refreshTargetTrend(); }
+        function populateTargetMfoSelect() { document.getElementById('tMFO').innerHTML = mfos.map(m => `<option value="${m}">${m}</option>`).join(''); }
+        function populateMfoSelect() { document.getElementById('fMFO').innerHTML = mfos.map(m => `<option value="${m}">${m}</option>`).join(''); }
+        function renderMfoList() { document.getElementById('mfoList').innerHTML = mfos.map((m, i) => `<div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border"><span class="font-bold">${m}</span><button onclick="deleteMfo(${i})" class="text-red-500 font-bold">Remove</button></div>`).join(''); }
+        function addMfo() { const val = document.getElementById('newMfoInput').value; if(val) { mfos.push(val); localStorage.setItem('b0861_mfos', JSON.stringify(mfos)); renderMfoList(); document.getElementById('newMfoInput').value=""; } }
+        function deleteMfo(i) { mfos.splice(i, 1); localStorage.setItem('b0861_mfos', JSON.stringify(mfos)); renderMfoList(); }
+        function deleteEntry(i) { logs.splice(i, 1); localStorage.setItem('b0861_logs', JSON.stringify(logs)); renderDashboard(); }
+
+        document.getElementById('targetForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            targets.push({ month: document.getElementById('tMonth').value, name: document.getElementById('tMFO').value, clients: document.getElementById('tClients').value, port: document.getElementById('tPort').value, coll: document.getElementById('tColl').value, disb: document.getElementById('tDisb').value });
+            localStorage.setItem('b0861_targets', JSON.stringify(targets));
+            refreshTargetTrend(); e.target.reset();
+        });
+
+        document.getElementById('entryForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            logs.push({ date: document.getElementById('fDate').value, name: document.getElementById('fMFO').value, clients: document.getElementById('fClients').value, port: document.getElementById('fPort').value, disb: document.getElementById('fDisb').value, coll: document.getElementById('fColl').value, rev: document.getElementById('fRev').value });
+            localStorage.setItem('b0861_logs', JSON.stringify(logs));
+            showPage('dashboard'); e.target.reset();
+        });
+
+        // Initialize App
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dashDate').value = today;
+        initLogo();
+        showPage('dashboard');
+    </script>
+</body>
+</html>
